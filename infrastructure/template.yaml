@@ -15,7 +15,7 @@ Parameters:
     Description: GitHub repository name
   GitHubOwner:
     Type: String
-    Default: sukh90
+    Default: sukhi90
     Description: GitHub username or organization owner
   GitHubBranch:
     Type: String
