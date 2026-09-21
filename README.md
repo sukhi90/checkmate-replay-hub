@@ -1,29 +1,26 @@
-# Checkmate Replay Hub
+## Milestone 1 Result
 
-AWS DevOps Engineer Professional Praxisprojekt.
+The Checkmate Replay Hub frontend is deployed automatically from GitHub.
 
-## Milestone 1
+### CI/CD Flow
 
-The first milestone provides:
+GitHub
+→ AWS CodePipeline
+→ AWS CodeBuild
+→ Amazon S3
 
-- Git repository
-- Publicly reachable frontend
-- Infrastructure as Code
-- Automated deployment using AWS CodePipeline and AWS CodeBuild
+A change pushed to the `main` branch automatically starts the pipeline and deploys the updated frontend.
 
-## Architecture
+### Infrastructure as Code
 
-GitHub → CodePipeline → CodeBuild → Amazon S3
+The AWS infrastructure is defined in:
 
-## Frontend
+`infrastructure/template.yaml`
 
-The frontend is a simple Hello World page for the Checkmate Replay Hub.
+The following resources are managed through CloudFormation:
 
-Later milestones will add:
-
-- Chess game upload
-- Email confirmation
-- Asynchronous processing
-- Chess validation
-- Result email
-- Final chessboard image
+- S3 website bucket
+- S3 artifact bucket
+- CodeBuild project
+- CodePipeline
+- IAM roles
