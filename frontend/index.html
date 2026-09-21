@@ -21,7 +21,7 @@
         
         <input type="email" id="email" placeholder="Enter your email" required><br>
         <input type="text" id="fileName" placeholder="Enter file name (e.g., partie.txt)" required><br>
-        <button onclick="submitData()">Submit to Live AWS Backend</button/<br>
+        <button onclick="submitData()">Submit to Live AWS Backend</button><br>
         
         <div id="message"></div>
     </div>
@@ -48,7 +48,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: emailValue, fileName: fileNameValue })
-                });
+                };
 
                 const data = await response.json();
                 messageDiv.style.color = "green";
