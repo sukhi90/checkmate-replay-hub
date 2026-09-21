@@ -48,7 +48,7 @@
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: json.stringify({ email: emailValue, fileName: fileNameValue })
+                    body: JSON.stringify({ email: emailValue, fileName: fileNameValue })
                 });
 
                 const data = await response.json();
