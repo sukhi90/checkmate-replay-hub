@@ -1,12 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Checkmate Replay Hub</title>
 
-    <link rel="stylesheet" href="style.css">
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
 </head>
 
 <body>
@@ -16,19 +26,61 @@
         <h1>Checkmate Replay Hub</h1>
 
         <p>
-            Welcome to Checkmate Replay Hub.
+            Upload your chess replay file for processing.
         </p>
 
-        <p>
-            Upload a chess replay file and receive the analysis by email.
-        </p>
+        <form id="submissionForm">
 
-        <div class="status">
-            Project status:
-            <strong>Milestone 1 - CI/CD Working!</strong>
+            <label for="email">
+                Email address
+            </label>
+
+            <input
+                type="email"
+                id="email"
+                name="email"
+                placeholder="you@example.com"
+                required
+            >
+
+            <label for="file">
+                Chess replay file
+            </label>
+
+            <input
+                type="file"
+                id="file"
+                name="file"
+                accept=".txt"
+                required
+            >
+
+            <button
+                type="submit"
+                id="submitButton"
+            >
+                Submit replay
+            </button>
+
+        </form>
+
+        <div class="status-box">
+
+            <p>
+                Status:
+                <strong id="status">
+                    READY
+                </strong>
+            </p>
+
+            <p id="message"></p>
+
         </div>
 
     </main>
 
+    <script src="app.js"></script>
+
 </body>
+
 </html>
