@@ -7,7 +7,7 @@ Parameters:
   GitHubOAuthToken:
     Type: String
     NoEcho: true
-    Default: "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"
+    Default: "YOUR_GITHUB_TOKEN_HERE"
     Description: GitHub Personal Access Token with repo scopes
   GitHubRepository:
     Type: String
@@ -60,7 +60,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: codebuild.amazonaws.com
+              Service: ://amazonaws.com
             Action:
               - sts:AssumeRole
       Policies:
@@ -80,6 +80,14 @@ Resources:
                   - s3:DeleteObject
                 Resource:
                   - !Sub 'arn:aws:s3:::${WebsiteBucket}/*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt PipelineArtifactBucket.Arn
+                  - !Sub 'arn:aws:s3:::${PipelineArtifactBucket}/*'
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
@@ -113,7 +121,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: codepipeline.amazonaws.com
+              Service: ://amazonaws.com
             Action:
               - sts:AssumeRole
       Policies:
@@ -142,7 +150,7 @@ Resources:
     Properties:
       Name: checkmate-replay-hub-pipeline
       RoleArn: !GetAtt CodePipelineRole.Arn
-      PipelineType: V1
+      PipelineType: V2
       ArtifactStore:
         Type: S3
         Location: !Ref PipelineArtifactBucket
