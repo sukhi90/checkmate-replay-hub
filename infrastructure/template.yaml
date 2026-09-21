@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 Description:
-  Checkmate Replay Hub - Milestone 1 & 2 infrastructure
+  Checkmate Replay Hub - Milestone 1 & 2 Completed Infrastructure
 
 Parameters:
   GitHubOAuthToken:
@@ -25,7 +25,7 @@ Resources:
   WebsiteBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'checkmate-replay-web-sukhi90-${AWS::AccountId}'
+      BucketName: !Sub 'checkmate-replay-web-sukhi90-${AWS::AccountId}-v2'
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: index.html
@@ -53,7 +53,7 @@ Resources:
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'checkmate-replay-artifacts-sukhi90-${AWS::AccountId}'
+      BucketName: !Sub 'checkmate-replay-artifacts-sukhi90-${AWS::AccountId}-v2'
 
   CodeBuildRole:
     Type: AWS::IAM::Role
@@ -164,32 +164,51 @@ Resources:
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
 
-  CheckmateBackendFunction:
-    Type: AWS::Lambda::Function
+  CheckmateApiGateway:
+    Type: AWS::ApiGateway::RestApi
     Properties:
-      FunctionName: checkmate-replay-backend
-      Handler: app.lambda_handler
-      Runtime: python3.9
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        ZipFile: |
-          import json
-          def lambda_handler(event, context):
-              return {
-                  'statusCode': 200,
-                  'headers': {
-                      'Access-Control-Allow-Origin': '*',
-                      'Access-Control-Allow-Headers': 'Content-Type',
-                      'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
-                  },
-                  'body': json.dumps({'message': 'Hello from Lambda inline default backend!'})
-              }
+      Name: checkmate-replay-api
+
+  SubmissionsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CheckmateApiGateway
+      ParentId: !GetAtt CheckmateApiGateway.RootResourceId
+      PathPart: submissions
+
+  SubmissionApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CheckmateApiGateway
+      ResourceId: !Ref SubmissionsResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SubmissionFunction.Arn}/invocations'
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: SubmissionApiMethod
+    Properties:
+      RestApiId: !Ref CheckmateApiGateway
+      StageName: Prod
+
+  SubmissionFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SubmissionFunction
+      Principal: !Sub 'apigateway.${AWS::URLSuffix}'
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${CheckmateApiGateway}/*/*/submissions'
+
 
   SubmissionFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: checkmate-replay-submission
-      Handler: app.lambda_handler
+      Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
@@ -203,7 +222,7 @@ Resources:
                       'Access-Control-Allow-Headers': 'Content-Type',
                       'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
                   },
-                  'body': json.dumps({'message': 'Hello from Submission inline default backend!'})
+                  'body': json.dumps({'message': 'Hello from Submission inline default backend!', 'status': 'success'})
               }
 
   CheckmatePipelineV2:
@@ -253,6 +272,6 @@ Outputs:
   WebsiteURL:
     Description: Public S3 website URL
     Value: !GetAtt WebsiteBucket.WebsiteURL
-  PipelineName:
-    Description: CodePipeline name
-    Value: !Ref CheckmatePipelineV2
+  ApiUrl:
+    Description: Production API Gateway endpoint URL
+    Value: !Sub 'https://${CheckmateApiGateway}.execute-api.${AWS::Region}://'
