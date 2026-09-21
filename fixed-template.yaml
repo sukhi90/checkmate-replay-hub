@@ -4,19 +4,13 @@ Description:
   Checkmate Replay Hub - Milestone 1 infrastructure
 
 Parameters:
-  GitHubOAuthToken:
+  GitHubConnectionArn:
     Type: String
-    NoEcho: true
-    Default: "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"
-    Description: GitHub Personal Access Token with repo scopes
+    Description: ARN of the AWS CodeConnections GitHub connection
   GitHubRepository:
     Type: String
-    Default: checkmate-replay-hub
-    Description: GitHub repository name
-  GitHubOwner:
-    Type: String
-    Default: sukh90
-    Description: GitHub username or organization owner
+    Default: sukh90/checkmate-replay-hub
+    Description: GitHub repository in owner/repository format
   GitHubBranch:
     Type: String
     Default: main
@@ -60,7 +54,8 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: codebuild.amazonaws.com
+              Service:
+                - codebuild.amazonaws.com
             Action:
               - sts:AssumeRole
       Policies:
@@ -113,7 +108,8 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: codepipeline.amazonaws.com
+              Service:
+                - codepipeline.amazonaws.com
             Action:
               - sts:AssumeRole
       Policies:
@@ -136,13 +132,17 @@ Resources:
                   - codebuild:BatchGetBuilds
                 Resource:
                   - !GetAtt CodeBuildProject.Arn
+              - Effect: Allow
+                Action:
+                  - codestar-connections:UseConnection
+                Resource: '*'
 
   CheckmatePipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
       Name: checkmate-replay-hub-pipeline
       RoleArn: !GetAtt CodePipelineRole.Arn
-      PipelineType: V1
+      PipelineType: V2
       ArtifactStore:
         Type: S3
         Location: !Ref PipelineArtifactBucket
@@ -152,14 +152,14 @@ Resources:
             - Name: GitHubSource
               ActionTypeId:
                 Category: Source
-                Owner: ThirdParty
-                Provider: GitHub
+                Owner: AWS
+                Provider: CodeStarSourceConnection
                 Version: '1'
               Configuration:
-                Owner: !Ref GitHubOwner
-                Repo: !Ref GitHubRepository
-                Branch: !Ref GitHubBranch
-                OAuthToken: !Ref GitHubOAuthToken
+                ConnectionArn: !Ref GitHubConnectionArn
+                FullRepositoryId: !Ref GitHubRepository
+                BranchName: !Ref GitHubBranch
+                DetectChanges: 'true'
               OutputArtifacts:
                 - Name: SourceOutput
               RunOrder: 1
