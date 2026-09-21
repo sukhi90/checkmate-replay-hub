@@ -25,7 +25,7 @@ Resources:
   WebsiteBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'checkmate-replay-web-sukh90-${AWS::AccountId}'
+      BucketName: !Sub 'checkmate-replay-web-sukhi90-${AWS::AccountId}'
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: index.html
@@ -53,7 +53,7 @@ Resources:
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'checkmate-replay-artifacts-sukh90-${AWS::AccountId}'
+      BucketName: !Sub 'checkmate-replay-artifacts-sukhi90-${AWS::AccountId}'
 
   CodeBuildRole:
     Type: AWS::IAM::Role
@@ -169,7 +169,7 @@ Resources:
     Properties:
       FunctionName: checkmate-replay-backend
       Handler: app.lambda_handler
-      Runtime: python3.11
+      Runtime: python3.9
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         ZipFile: |
@@ -183,6 +183,27 @@ Resources:
                       'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
                   },
                   'body': json.dumps({'message': 'Hello from Lambda inline default backend!'})
+              }
+
+  SubmissionFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: checkmate-replay-submission
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'headers': {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': 'Content-Type',
+                      'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+                  },
+                  'body': json.dumps({'message': 'Hello from Submission inline default backend!'})
               }
 
   CheckmatePipelineV2:
