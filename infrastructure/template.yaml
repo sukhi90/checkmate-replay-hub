@@ -79,7 +79,7 @@ Resources:
                   - s3:PutObject
                   - s3:DeleteObject
                 Resource:
-                  - !Sub 'arn:aws:s3:::${WebsiteBucket}/*'
+                  - !Sub 'arn:aws:s3:::${PipelineArtifactBucket}/*'
               - Effect: Allow
                 Action:
                   - s3:GetObject
