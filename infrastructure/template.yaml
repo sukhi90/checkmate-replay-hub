@@ -200,3 +200,15 @@ Outputs:
   PipelineName:
     Description: CodePipeline name
     Value: !Ref CheckmatePipelineV2
+  CheckmateBackendFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /replay
+            Method: post
