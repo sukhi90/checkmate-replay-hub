@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description:
+  Checkmate Replay Hub - Milestone 1 infrastructure
+
+Parameters:
+
+  GitHubConnectionArn:
+    Type: String
+    Description: ARN of the AWS CodeConnections GitHub connection
+
+  GitHubRepository:
+    Type: String
+    Default: sukh90/checkmate-replay-hub
+    Description: GitHub repository in owner/repository format
+
+  GitHubBranch:
+    Type: String
+    Default: main
+
+Resources:
+
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+
+      PolicyDocument:
+        Version: '2012-10-17'
+
+        Statement:
+          - Sid: PublicReadForWebsite
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub '${WebsiteBucket.Arn}/*'
+
+  PipelineArtifactBucket:
+    Type: AWS::S3::Bucket
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+
+    Properties:
+
+      AssumeRolePolicyDocument:
+
+        Version: '2012-10-17'
+
+        Statement:
+
+          - Effect: Allow
+
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+
+            Action:
+              - sts:AssumeRole
+
+      Policies:
+
+        - PolicyName: DeployFrontendToS3
+
+          PolicyDocument:
+
+            Version: '2012-10-17'
+
+            Statement:
+
+              - Effect: Allow
+
+                Action:
+                  - s3:ListBucket
+
+                Resource:
+                  - !GetAtt WebsiteBucket.Arn
+
+              - Effect: Allow
+
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+
+                Resource:
+                  - !Sub '${WebsiteBucket.Arn}/*'
+
+              - Effect: Allow
+
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+
+                Resource: '*'
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+
+    Properties:
+
+      Name: checkmate-replay-hub-build
+
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+
+      Artifacts:
+        Type: CODEPIPELINE
+
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+
+      Environment:
+
+        ComputeType: BUILD_GENERAL1_SMALL
+
+        Image: aws/codebuild/standard:7.0
+
+        Type: LINUX_CONTAINER
+
+        EnvironmentVariables:
+
+          - Name: WEBSITE_BUCKET
+            Value: !Ref WebsiteBucket
+
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+
+    Properties:
+
+      AssumeRolePolicyDocument:
+
+        Version: '2012-10-17'
+
+        Statement:
+
+          - Effect: Allow
+
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+
+            Action:
+              - sts:AssumeRole
+
+      Policies:
+
+        - PolicyName: CodePipelineAccess
+
+          PolicyDocument:
+
+            Version: '2012-10-17'
+
+            Statement:
+
+              - Effect: Allow
+
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                  - s3:GetBucketVersioning
+
+                Resource:
+                  - !Sub '${PipelineArtifactBucket.Arn}'
+                  - !Sub '${PipelineArtifactBucket.Arn}/*'
+
+              - Effect: Allow
+
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+
+                Resource:
+                  - !GetAtt CodeBuildProject.Arn
+
+              - Effect: Allow
+
+                Action:
+                  - codestar-connections:UseConnection
+
+                Resource:
+                  - !Ref GitHubConnectionArn
+
+  CheckmatePipeline:
+    Type: AWS::CodePipeline::Pipeline
+
+    Properties:
+
+      Name: checkmate-replay-hub-pipeline
+
+      RoleArn: !GetAtt CodePipelineRole.Arn
+
+      PipelineType: V2
+
+      ArtifactStore:
+
+        Type: S3
+
+        Location: !Ref PipelineArtifactBucket
+
+      Stages:
+
+        - Name: Source
+
+          Actions:
+
+            - Name: GitHubSource
+
+              ActionTypeId:
+
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: '1'
+
+              Configuration:
+
+                ConnectionArn: !Ref GitHubConnectionArn
+                FullRepositoryId: !Ref GitHubRepository
+                BranchName: !Ref GitHubBranch
+                DetectChanges: 'true'
+
+              OutputArtifacts:
+                - Name: SourceOutput
+
+              RunOrder: 1
+
+        - Name: Build
+
+          Actions:
+
+            - Name: BuildFrontend
+
+              ActionTypeId:
+
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+
+              Configuration:
+
+                ProjectName: !Ref CodeBuildProject
+
+              InputArtifacts:
+                - Name: SourceOutput
+
+              RunOrder: 1
+
+Outputs:
+
+  WebsiteBucketName:
+    Description: S3 bucket containing the frontend
+    Value: !Ref WebsiteBucket
+
+  WebsiteURL:
+    Description: Public S3 website URL
+    Value: !GetAtt WebsiteBucket.WebsiteURL
+
+  PipelineName:
+    Description: CodePipeline name
+    Value: !Ref CheckmatePipeline
+

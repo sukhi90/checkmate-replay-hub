@@ -1,0 +1,30 @@
+version: 0.2
+
+phases:
+
+  install:
+    commands:
+      - echo "Installing dependencies"
+      - aws --version
+
+  pre_build:
+    commands:
+      - echo "Running validation"
+      - test -f frontend/index.html
+      - test -f frontend/style.css
+
+  build:
+    commands:
+      - echo "Building frontend"
+      - mkdir -p dist
+      - cp -r frontend/* dist/
+
+  post_build:
+    commands:
+      - echo "Deploying frontend to S3"
+      - aws s3 sync dist/ s3://$WEBSITE_BUCKET/ --delete
+
+artifacts:
+  files:
+    - '**/*'
+  base-directory: dist
