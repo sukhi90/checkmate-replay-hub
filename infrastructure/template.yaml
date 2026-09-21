@@ -7,7 +7,7 @@ Parameters:
   GitHubOAuthToken:
     Type: String
     NoEcho: true
-    Default: "YOUR_GITHUB_TOKEN_HERE"
+    Default: "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"
     Description: GitHub Personal Access Token with repo scopes
   GitHubRepository:
     Type: String
@@ -60,7 +60,8 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: ://amazonaws.com
+              Service:
+                - !Sub 'codebuild.${AWS::URLSuffix}'
             Action:
               - sts:AssumeRole
       Policies:
@@ -79,7 +80,7 @@ Resources:
                   - s3:PutObject
                   - s3:DeleteObject
                 Resource:
-                  - !Sub 'arn:aws:s3:::${PipelineArtifactBucket}/*'
+                  - !Sub 'arn:aws:s3:::${WebsiteBucket}/*'
               - Effect: Allow
                 Action:
                   - s3:GetObject
@@ -121,7 +122,8 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: ://amazonaws.com
+              Service:
+                - !Sub 'codepipeline.${AWS::URLSuffix}'
             Action:
               - sts:AssumeRole
       Policies:
