@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 Description:
-  Checkmate Replay Hub - Milestone 1 infrastructure
+  Checkmate Replay Hub - Milestone 1 & 2 infrastructure
 
 Parameters:
   GitHubOAuthToken:
@@ -150,6 +150,41 @@ Resources:
                 Resource:
                   - !GetAtt CodeBuildProject.Arn
 
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !Sub 'lambda.${AWS::URLSuffix}'
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  CheckmateBackendFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: checkmate-replay-backend
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'headers': {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': 'Content-Type',
+                      'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+                  },
+                  'body': json.dumps({'message': 'Hello from Lambda inline default backend!'})
+              }
+
   CheckmatePipelineV2:
     Type: AWS::CodePipeline::Pipeline
     Properties:
@@ -200,15 +235,3 @@ Outputs:
   PipelineName:
     Description: CodePipeline name
     Value: !Ref CheckmatePipelineV2
-  CheckmateBackendFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: backend/
-      Handler: app.lambda_handler
-      Runtime: python3.11
-      Events:
-        ApiEvent:
-          Type: Api
-          Properties:
-            Path: /replay
-            Method: post
