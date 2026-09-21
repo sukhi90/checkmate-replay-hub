@@ -21,13 +21,13 @@
         
         <input type="email" id="email" placeholder="Enter your email" required><br>
         <input type="text" id="fileName" placeholder="Enter file name (e.g., partie.txt)" required><br>
-        <button onclick="submitData()">Submit to Live AWS Backend</button>
+        <button onclick="submitData()">Submit to Live AWS Backend</button/<br>
         
         <div id="message"></div>
     </div>
 
     <script>
-        const API_URL = "https://6ms0w1zblk.execute-api.us-east-1.amazonaws.com/Prod";
+        const API_URL = "https://6ms0w1zblk.execute-api.us-east-1.amazonaws.com/Prod/submission";
 
         async function submitData() {
             const emailValue = document.getElementById('email').value;
