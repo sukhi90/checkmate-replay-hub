@@ -1,86 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkmate Replay Hub</title>
-
-    <link
-        rel="stylesheet"
-        href="style.css"
-    >
-
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; text-align: center; }
+        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        h1 { color: #333; }
+        input[type="email"], input[type="text"] { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #0056b3; }
+        #message { margin-top: 15px; font-weight: bold; color: green; }
+    </style>
 </head>
-
 <body>
-
-    <main class="container">
-
+    <div class="container">
         <h1>Checkmate Replay Hub</h1>
+        <p>Milestone 2 - Live Backend Integration Test</p>
+        
+        <input type="email" id="email" placeholder="Enter your email" required><br>
+        <input type="text" id="fileName" placeholder="Enter file name (e.g., partie.txt)" required><br>
+        <button onclick="submitData()">Submit to Live AWS Backend</button>
+        
+        <div id="message"></div>
+    </div>
 
-        <p>
-            Upload your chess replay file for processing.
-        </p>
+    <script>
+        // ਪੱਕਾ ਲਾਈਵ AWS API Gateway ਲਿੰਕ
+        const API_URL = "https://amazonaws.com";
 
-        <form id="submissionForm">
+        async function submitData() {
+            const emailValue = document.getElementById('email').value;
+            const fileNameValue = document.getElementById('fileName').value;
+            const messageDiv = document.getElementById('message');
 
-            <label for="email">
-                Email address
-            </label>
+            if (!emailValue || !fileNameValue) {
+                messageDiv.style.color = "red";
+                messageDiv.innerText = "Please fill in all fields.";
+                return;
+            }
 
-            <input
-                type="email"
-                id="email"
-                name="email"
-                placeholder="you@example.com"
-                required
-            >
+            messageDiv.style.color = "orange";
+            messageDiv.innerText = "Submitting to AWS Cloud...";
 
-            <label for="file">
-                Chess replay file
-            </label>
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: json.stringify({ email: emailValue, fileName: fileNameValue })
+                });
 
-            <input
-                type="file"
-                id="file"
-                name="file"
-                accept=".txt"
-                required
-            >
-
-            <button
-                type="submit"
-                id="submitButton"
-            >
-                Submit replay
-            </button>
-
-        </form>
-
-        <div class="status-box">
-
-            <p>
-                Status:
-                <strong id="status">
-                    READY
-                </strong>
-            </p>
-
-            <p id="message"></p>
-
-        </div>
-
-    </main>
-
-    <script src="app.js"></script>
-
+                const data = await response.json();
+                messageDiv.style.color = "green";
+                messageDiv.innerText = "Success! AWS Lambda says: " + data.message;
+            } catch (error) {
+                console.error("Error:", error);
+                messageDiv.style.color = "red";
+                messageDiv.innerText = "Submission Failed. Check browser console.";
+            }
+        }
+    </script>
 </body>
-
 </html>
