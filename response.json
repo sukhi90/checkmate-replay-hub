@@ -1,1 +1,1 @@
-{"errorMessage": "Unable to import module 'app': No module named 'app'", "errorType": "Runtime.ImportModuleError", "requestId": "", "stackTrace": []}
+{"statusCode": 200, "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "OPTIONS,POST,GET"}, "body": "{\"message\": \"Hello from Submission inline default backend!\", \"status\": \"success\"}"}
