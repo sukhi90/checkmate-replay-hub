@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-
+Transform: AWS::Serverless-2016-10-31
 Description: >
   Checkmate Replay Hub - Milestone 1 & 2 Fully Integrated Production Stack
 
@@ -240,7 +240,7 @@ Resources:
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${CheckmateApiGateway}/*/*/submissions'
 
   SubmissionFunction:
-    Type: AWS::Serverless::Function
+    Type: AWS::Lambda::Function
     Properties:
       Handler: app.lambda_handler
       Runtime: python3.9
@@ -261,3 +261,4 @@ Resources:
           UPLOAD_BUCKET: checkmate-upload-bucket
           TABLE_NAME: checkmate-submissions-table
           SES_SENDER_EMAIL: !Ref SESEmailAddress
+
