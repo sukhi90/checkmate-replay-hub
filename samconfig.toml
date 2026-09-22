@@ -19,7 +19,7 @@ resolve_s3 = true
 s3_prefix = "checkmate-production-v4"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "GitHubRepository=\"checkmate-replay-hub\" GitHubOwner=\"sukhi90\" GitHubBranch=\"main\" SESEmailAddress=\"sukhjeewansukhi@gmail.com\""
+parameter_overrides = "GitHubConnectionArn=\"\" GitHubRepository=\"checkmate-replay-hub\" GitHubBranch=\"main\""
 image_repositories = []
 
 [default.global.parameters]

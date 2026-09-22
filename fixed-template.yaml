@@ -177,13 +177,11 @@ Resources:
                 - Name: SourceOutput
               RunOrder: 1
       Events:
-        CreateSubmission:
-          Type: HttpApi
+         CreateSubmission:
+          Type: Api
           Properties:
-            ApiId: !Ref CheckmateApi
-            Path: https://sve3f9df5j.execute-api.us-east-1.amazonaws.com/Prod/submissions
-            Method: POST                # <-- Must match your curl precisely
-
+            Path: /submissions
+            Method: POST
 
 Outputs:
   WebsiteBucketName:

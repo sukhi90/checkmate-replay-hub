@@ -206,28 +206,30 @@ If you did not submit this file, you can ignore this email.
 </html>
 """
 
-    ses.send_email(
-        Source=SES_SENDER_EMAIL,
-        Destination={
-            "ToAddresses": [email]
-        },
-        Message={
-            "Subject": {
-                "Data": subject,
-                "Charset": "UTF-8"
-            },
-            "Body": {
-                "Text": {
-                    "Data": text_body,
-                    "Charset": "UTF-8"
-                },
-                "Html": {
-                    "Data": html_body,
-                    "Charset": "UTF-8"
-                }
-            }
-        }
-    )
+print("⚠️ Sandbox Mode: SES Bypassed")
+    # ses.send_email(
+    #     Source=SES_SENDER_EMAIL,
+    #     Destination={
+    #         "ToAddresses": [email]
+    #     },
+    #     Message={
+    #         "Subject": {
+    #             "Data": subject,
+    #             "Charset": "UTF-8"
+    #         },
+    #         "Body": {
+    #             "Text": {
+    #                 "Data": text_body,
+    #                 "Charset": "UTF-8"
+    #             },
+    #             "Html": {
+    #                 "Data": html_body,
+    #                 "Charset": "UTF-8"
+    #             }
+    #         }
+    #     }
+    # )
+print("⚠️ Sandbox Mode: SES is disabled. Skipping email sending.")
 
 
 # ---------------------------------------------------------
