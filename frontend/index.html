@@ -19,14 +19,14 @@ button:hover { background-color: #0056b3; }
 <p>Milestone 2 - Live Backend Integration Test</p>
 
 <input type="email" id="email" placeholder="Enter your email" required><br><br>
-<input type="text" id="fileName" placeholder="Enter file name (e.g., partie.txt)" required><br><br>
-<button onclick="submitData()">Submit to Live AWS Backend</button>
+<input type="text" id="fileName" placeholder="Enter file name (e.g., partie.txt)" required><br>
+<button onclick="submitData()">Submit to Live AWS Backend</button><br>
 
 <div id="message"></div>
 </div>
 
 <script>
-const API_URL = "https://6ms0w1zblk.execute-api.us-east-1.amazonaws.com/Prod/submissions";
+const API_URL = https://sve3f9df5j.execute-api.us-east-1.amazonaws.com/Prod/submissions";
 
 async function submitData() {
 const emailValue = document.getElementById('email').value;

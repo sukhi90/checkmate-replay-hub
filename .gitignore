@@ -1,8 +1,6 @@
-.aws-sam/
-.sam/
 .venv/
 __pycache__/
 *.pyc
-.env
-node_modules/
-.DS_Store
+
+uploads/*
+!uploads/.gitkeep
