@@ -4,3 +4,6 @@ __pycache__/
 
 uploads/*
 !uploads/.gitkeep
+infrastructure/template-m2-backup.yaml
+backend/submission/app-m2-backup.py
+frontend/app-m2-backup.js

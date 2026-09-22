@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: >
+Description:
   Checkmate Replay Hub - Milestone 1 & 2 Fully Integrated Production Stack
 
 Parameters:
@@ -20,16 +20,15 @@ Parameters:
   GitHubBranch:
     Type: String
     Default: main
+Parameters:
   SESEmailAddress:
     Type: String
     Description: Verified Amazon SES sender email address
-
 Resources:
-  SESEmailIdentity:
+SESEmailIdentity:
     Type: AWS::SES::EmailIdentity
     Properties:
       EmailIdentity: !Ref SESEmailAddress
-
   WebsiteBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -76,6 +75,17 @@ Resources:
             Action:
               - sts:AssumeRole
       Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SubmissionTable
+        - S3CrudPolicy:
+            BucketName: !Ref UploadBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+              Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SESEmailAddress}"
+
+
         - PolicyName: DeployFrontendToS3
           PolicyDocument:
             Version: '2012-10-17'
@@ -117,10 +127,11 @@ Resources:
       Source:
         Type: CODEPIPELINE
         BuildSpec: buildspec.yml
-      Environment:     
-        ComputeType: BUILD_GENERAL1_SMALL
-        Image: aws/codebuild/standard:7.0
-        Type: LINUX_CONTAINER
+   Environment:     
+      ComputeType: BUILD_GENERAL1_SMALL
+      Image: aws/codebuild/standard:7.0
+      Type: LINUX_CONTAINER
+        Environment:
         Variables:
           - Name: WEBSITE_BUCKET
             Value: !Ref WebsiteBucket
@@ -213,6 +224,10 @@ Resources:
             ResponseTemplates:
               application/json: ""
             StatusCode: '200'
+
+            ResponseTemplates:
+              application/json: ""
+            StatusCode: '200'
         RequestTemplates:
           application/json: "{\"statusCode\": 200}"
       MethodResponses:
@@ -239,25 +254,124 @@ Resources:
       Principal: !Sub 'apigateway.${AWS::URLSuffix}'
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${CheckmateApiGateway}/*/*/submissions'
 
-  SubmissionFunction:
+   SubmissionFunction:
     Type: AWS::Serverless::Function
+    Environment:
+      Variables:
+        UPLOAD_BUCKET: !Ref UploadBucket
+        TABLE_NAME: !Ref SubmissionTable
+        SES_SENDER_EMAIL: !Ref SESEmailAddress
+        API_URL: !Sub "https://${CheckmateApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Type: AWS::Lambda::Function
     Properties:
-      Handler: app.lambda_handler
+      FunctionName: checkmate-replay-submission
+      Handler: index.lambda_handler
       Runtime: python3.9
-      CodeUri: src/
       Role: !GetAtt LambdaExecutionRole.Arn
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: checkmate-submissions-table
-        - S3CrudPolicy:
-            BucketName: checkmate-upload-bucket
-        - Statement:
-            - Effect: Allow
-              Action:
-                - ses:SendEmail
-              Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SESEmailAddress}"
-      Environment:
-        Variables:
-          UPLOAD_BUCKET: checkmate-upload-bucket
-          TABLE_NAME: checkmate-submissions-table
-          SES_SENDER_EMAIL: !Ref SESEmailAddress
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'headers': {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': 'Content-Type',
+                      'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+                  },
+                  'body': json.dumps({'message': 'Hello from Submission inline default backend!', 'status': 'success'})
+              }
+    Events:
+
+      CreateSubmission:
+        Type: HttpApi
+        Properties:
+          ApiId: !Ref CheckmateApi
+          Path: /submissions
+          Method: POST
+
+      CompleteSubmission:
+        Type: HttpApi
+        Properties:
+          ApiId: !Ref CheckmateApi
+          Path: /submissions/{submissionId}/complete
+          Method: POST
+
+      ConfirmSubmission:
+        Type: HttpApi
+        Properties:
+          ApiId: !Ref CheckmateApi
+          Path: /confirm/{token}
+          Method: GET
+
+  CheckmatePipelineV2:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: checkmate-replay-hub-pipeline
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      PipelineType: V2
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHubSource
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: '1'
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref GitHubRepository
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubOAuthToken
+              OutputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: BuildFrontend
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+
+  CheckmateApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - content-type
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+
+Outputs:
+  WebsiteBucketName:
+    Description: S3 bucket containing the frontend
+    Value: !Ref WebsiteBucket
+  WebsiteURL:
+    Description: Public S3 website URL
+    Value: !GetAtt WebsiteBucket.WebsiteURL
+  ApiUrl:
+    Description: Production API Gateway endpoint URL
+    Value: !Sub 'https://${CheckmateApiGateway}.execute-api.${AWS::Region}.${AWS::URLSuffix}/Prod/submissions'
+  SESEmailAddress:
+    Description: SES sender email address
+    Value: !Ref SESEmailAddress
+
+  ConfirmationEndpoint:
+    Description: Confirmation endpoint
+    Value: !Sub "https://${CheckmateApi}.execute-api.${AWS::Region}.amazonaws.com/confirm/{token}"

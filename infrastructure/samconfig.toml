@@ -1,0 +1,14 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "checkmate-replay-hub-m2"
+resolve_s3 = true
+s3_prefix = "checkmate-replay-hub-m2"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "GitHubRepository=\"checkmate-replay-hub\" GitHubOwner=\"sukhi90\" GitHubBranch=\"main\" SESEmailAddress=\"sukhjeewansukhi@gmail.com\""
+image_repositories = []
+
+[default.global.parameters]
+region = "us-east-1"

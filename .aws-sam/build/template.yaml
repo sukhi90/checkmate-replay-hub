@@ -1,0 +1,283 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Checkmate Replay Hub - Milestone 1 & 2 Fully Integrated Production Stack
+
+  '
+Parameters:
+  GitHubOAuthToken:
+    Type: String
+    NoEcho: true
+    Default: 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
+    Description: GitHub Personal Access Token with repo scopes
+  GitHubRepository:
+    Type: String
+    Default: checkmate-replay-hub
+    Description: GitHub repository name
+  GitHubOwner:
+    Type: String
+    Default: sukhi90
+    Description: GitHub username or organization owner
+  GitHubBranch:
+    Type: String
+    Default: main
+  SESEmailAddress:
+    Type: String
+    Description: Verified Amazon SES sender email address
+Resources:
+  SESEmailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity:
+        Ref: SESEmailAddress
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: checkmate-replay-web-sukhi90-${AWS::AccountId}-v2
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: false
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: false
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: PublicReadForWebsite
+          Effect: Allow
+          Principal: '*'
+          Action:
+          - s3:GetObject
+          Resource:
+          - Fn::Sub: arn:aws:s3:::${WebsiteBucket}/*
+  PipelineArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: checkmate-replay-artifacts-sukhi90-${AWS::AccountId}-v2
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - Fn::Sub: codebuild.${AWS::URLSuffix}
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: DeployFrontendToS3
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:ListBucket
+            Resource:
+            - Fn::GetAtt:
+              - WebsiteBucket
+              - Arn
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+            Resource:
+            - Fn::Sub: arn:aws:s3:::${WebsiteBucket}/*
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:GetObjectVersion
+            - s3:ListBucket
+            Resource:
+            - Fn::GetAtt:
+              - PipelineArtifactBucket
+              - Arn
+            - Fn::Sub: arn:aws:s3:::${PipelineArtifactBucket}/*
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: checkmate-replay-hub-build
+      ServiceRole:
+        Fn::GetAtt:
+        - CodeBuildRole
+        - Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        Type: LINUX_CONTAINER
+        Variables:
+        - Name: WEBSITE_BUCKET
+          Value:
+            Ref: WebsiteBucket
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - Fn::Sub: codepipeline.${AWS::URLSuffix}
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: CodePipelineAccess
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:GetObjectVersion
+            - s3:PutObject
+            - s3:GetBucketVersioning
+            Resource:
+            - Fn::GetAtt:
+              - PipelineArtifactBucket
+              - Arn
+            - Fn::Sub: arn:aws:s3:::${PipelineArtifactBucket}/*
+          - Effect: Allow
+            Action:
+            - codebuild:StartBuild
+            - codebuild:BatchGetBuilds
+            Resource:
+            - Fn::GetAtt:
+              - CodeBuildProject
+              - Arn
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - Fn::Sub: lambda.${AWS::URLSuffix}
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  CheckmateApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: checkmate-replay-api
+  SubmissionsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: CheckmateApiGateway
+      ParentId:
+        Fn::GetAtt:
+        - CheckmateApiGateway
+        - RootResourceId
+      PathPart: submissions
+  SubmissionApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CheckmateApiGateway
+      ResourceId:
+        Ref: SubmissionsResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SubmissionFunction.Arn}/invocations
+  OptionsApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CheckmateApiGateway
+      ResourceId:
+        Ref: SubmissionsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+            method.response.header.Access-Control-Allow-Methods: '''OPTIONS,POST,GET'''
+            method.response.header.Access-Control-Allow-Origin: '''*'''
+          ResponseTemplates:
+            application/json: ''
+          StatusCode: '200'
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+      - ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: true
+          method.response.header.Access-Control-Allow-Methods: true
+          method.response.header.Access-Control-Allow-Origin: true
+        StatusCode: '200'
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+    - SubmissionApiMethod
+    - OptionsApiMethod
+    Properties:
+      RestApiId:
+        Ref: CheckmateApiGateway
+      StageName: Prod
+  SubmissionFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: SubmissionFunction
+      Principal:
+        Fn::Sub: apigateway.${AWS::URLSuffix}
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${CheckmateApiGateway}/*/*/submissions
+  SubmissionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      CodeUri: SubmissionFunction
+      Role:
+        Fn::GetAtt:
+        - LambdaExecutionRole
+        - Arn
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: checkmate-submissions-table
+      - S3CrudPolicy:
+          BucketName: checkmate-upload-bucket
+      - Statement:
+        - Effect: Allow
+          Action:
+          - ses:SendEmail
+          Resource:
+            Fn::Sub: arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SESEmailAddress}
+      Environment:
+        Variables:
+          UPLOAD_BUCKET: checkmate-upload-bucket
+          TABLE_NAME: checkmate-submissions-table
+          SES_SENDER_EMAIL:
+            Ref: SESEmailAddress
+    Metadata:
+      SamResourceId: SubmissionFunction
