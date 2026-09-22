@@ -1,203 +1,60 @@
-const API_URL =
-    "http://checkmate-replay-web-sukhi90-786469175346.s3-website-us-east-1.amazonaws.com/prod";
+const form = document.getElementById("uploadForm");
+const statusBox = document.getElementById("status");
 
+const params = new URLSearchParams(window.location.search);
 
-const form =
-    document.getElementById("submissionForm");
-
-const emailInput =
-    document.getElementById("email");
-
-const fileInput =
-    document.getElementById("file");
-
-const submitButton =
-    document.getElementById("submitButton");
-
-const statusElement =
-    document.getElementById("status");
-
-const messageElement =
-    document.getElementById("message");
-
-
-function setStatus(status, message = "") {
-
-    statusElement.textContent = status;
-
-    messageElement.textContent = message;
+if (params.get("confirmed") === "1") {
+    statusBox.textContent =
+        "Your email has been confirmed. Your submission is now being processed.";
 }
-
 
 form.addEventListener("submit", async (event) => {
 
     event.preventDefault();
 
-    const email =
-        emailInput.value.trim();
-
-    const file =
-        fileInput.files[0];
-
-
-    if (!email) {
-
-        setStatus(
-            "ERROR",
-            "Please enter your email address."
-        );
-
-        return;
-    }
-
+    const email = document.getElementById("email").value;
+    const file = document.getElementById("file").files[0];
 
     if (!file) {
-
-        setStatus(
-            "ERROR",
-            "Please select a chess replay file."
-        );
-
+        statusBox.textContent = "Please select a chess file.";
         return;
     }
 
-
-    if (!file.name.toLowerCase().endsWith(".txt")) {
-
-        setStatus(
-            "ERROR",
-            "Only .txt replay files are allowed."
-        );
-
-        return;
-    }
-
-
-    submitButton.disabled = true;
-
-    setStatus(
-        "UPLOADING",
-        "Preparing your upload..."
-    );
-
+    statusBox.textContent = "UPLOADING";
 
     try {
 
-        // ------------------------------------------------
-        // STEP 1
-        // Ask backend for a presigned S3 URL
-        // ------------------------------------------------
+        const content = await file.text();
 
-        const createResponse =
-            await fetch(
-                `${API_URL}/submissions`,
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body: JSON.stringify({
-                        email: email,
-                        fileName: file.name
-                    })
-                }
-            );
-
-
-        const createData =
-            await createResponse.json();
-
-
-        if (!createResponse.ok) {
-
-            throw new Error(
-                createData.error ||
-                "Could not create submission."
-            );
-        }
-
-
-        // ------------------------------------------------
-        // STEP 2
-        // Upload directly to S3
-        // ------------------------------------------------
-
-        const uploadResponse =
-            await fetch(
-                createData.uploadUrl,
-                {
-                    method: "PUT",
-
-                    headers: {
-                        "Content-Type":
-                            "text/plain"
-                    },
-
-                    body: file
-                }
-            );
-
-
-        if (!uploadResponse.ok) {
-
-            throw new Error(
-                "File upload to S3 failed."
-            );
-        }
-
-
-        // ------------------------------------------------
-        // STEP 3
-        // Tell backend that upload completed
-        // ------------------------------------------------
-
-        const completeResponse =
-            await fetch(
-                `${API_URL}/submissions/${createData.submissionId}/complete`,
-                {
-                    method: "POST"
-                }
-            );
-
-
-        const completeData =
-            await completeResponse.json();
-
-
-        if (!completeResponse.ok) {
-
-            throw new Error(
-                completeData.error ||
-                "Could not complete submission."
-            );
-        }
-
-
-        setStatus(
-            "UPLOADED",
-            "Your chess replay was uploaded successfully."
+        const response = await fetch(
+            window.CHECKMATE_API_URL + "/upload",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    email: email,
+                    filename: file.name,
+                    content: content
+                })
+            }
         );
 
+        const data = await response.json();
 
-        form.reset();
+        if (!response.ok) {
+            throw new Error(data.message || "Upload failed.");
+        }
 
+        statusBox.textContent =
+            data.status || "AWAITING_CONFIRMATION";
 
     } catch (error) {
 
         console.error(error);
 
-        setStatus(
-            "ERROR",
-            error.message
-        );
-
-    } finally {
-
-        submitButton.disabled = false;
-
+        statusBox.textContent =
+            "ERROR: " + error.message;
     }
-
 });

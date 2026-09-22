@@ -2,6 +2,6 @@
 clear
 echo "Sending isolated request directly to the LOCAL Python Backend..."
 
-curl -i -X POST "http://127.0.0" \
+curl -i -X POST "localhost/submissions" \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","fileName":"partie.txt"}'

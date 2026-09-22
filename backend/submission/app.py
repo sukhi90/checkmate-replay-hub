@@ -167,7 +167,7 @@ Checkmate Replay Hub
 <strong>Submission ID:</strong><br>
 {submission_id}
 </p>
-
+# table.put_item(Item=item)
 <p>
 Please confirm your submission by clicking the button below:
 </p>
@@ -278,7 +278,7 @@ def create_submission(event):
         "createdAt": now_iso()
     }
 
-    table.put_item(Item=item)
+#table.put_item(Item=item)
 
     upload_url = s3.generate_presigned_url(
         ClientMethod="put_object",

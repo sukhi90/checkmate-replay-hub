@@ -1,64 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Checkmate Replay Hub</title>
-<style>
-body { font-family: Arial, sans-serif; margin: 40px; }
-.container { max-width: 400px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
-input { width: 100%; padding: 8px; margin: 8px 0; box-sizing: border-box; }
-button { background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; width: 100%; }
-button:hover { background-color: #0056b3; }
-#message { margin-top: 15px; font-weight: bold; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkmate Replay Hub</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="container">
-<h1>Checkmate Replay Hub</h1>
-<p>Milestone 2 - Live Backend Integration Test</p>
 
-<input type="email" id="email" placeholder="Enter your email" required><br><br>
-<input type="text" id="fileName" placeholder="Enter file name (e.g., partie.txt)" required><br>
-<button onclick="submitData()">Submit to Live AWS Backend</button><br>
+    <h1>Checkmate Replay Hub</h1>
 
-<div id="message"></div>
+    <p>
+        Upload a chess replay file and confirm your submission by email.
+    </p>
+
+    <form id="uploadForm">
+
+        <label>
+            Email address
+        </label>
+
+        <input
+            id="email"
+            type="email"
+            required
+            placeholder="you@example.com"
+        >
+
+        <label>
+            Chess replay file
+        </label>
+
+        <input
+            id="file"
+            type="file"
+            required
+            accept=".txt"
+        >
+
+        <button type="submit">
+            Upload game
+        </button>
+
+    </form>
+
+    <div id="status"></div>
+
 </div>
 
-<script>
-const API_URL = https://sve3f9df5j.execute-api.us-east-1.amazonaws.com/Prod/submissions";
-
-async function submitData() {
-const emailValue = document.getElementById('email').value;
-const fileNameValue = document.getElementById('fileName').value;
-const messageDiv = document.getElementById('message');
-
-if (!emailValue || !fileNameValue) {
-messageDiv.style.color = "red";
-messageDiv.innerText = "Please fill in all fields.";
-return;
-}
-
-messageDiv.style.color = "orange";
-messageDiv.innerText = "Submitting to AWS Cloud...";
-
-try {
-const response = await fetch(API_URL, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ email: emailValue, fileName: fileNameValue })
-});
-
-const data = await response.json();
-messageDiv.style.color = "green";
-messageDiv.innerText = "Success! AWS Lambda says: " + data.message;
-} catch (error) {
-console.error("Error:", error);
-messageDiv.style.color = "red";
-messageDiv.innerText = "Submission Failed. Check browser console.";
-}
-}
-</script>
+<script src="app.js"></script>
 
 </body>
 </html>

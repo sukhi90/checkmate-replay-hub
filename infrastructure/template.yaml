@@ -1,264 +1,148 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  Checkmate Replay Hub - Milestone 1 & 2 Fully Integrated Production Stack
+
+Description: Checkmate Replay Hub - Milestones 2, 3 and 4
 
 Parameters:
-  GitHubOAuthToken:
+
+  SesFromEmail:
     Type: String
-    NoEcho: true
-    Default: "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"
-    Description: GitHub Personal Access Token with repo scopes
-  GitHubRepository:
+
+  PublicUrl:
     Type: String
-    Default: checkmate-replay-hub
-    Description: GitHub repository name
-  GitHubOwner:
-    Type: String
-    Default: sukhi90
-    Description: GitHub username or organization owner
-  GitHubBranch:
-    Type: String
-    Default: main
-  SESEmailAddress:
-    Type: String
-    Description: Verified Amazon SES sender email address
+
+Globals:
+
+  Function:
+    Runtime: python3.12
+    Timeout: 60
+    MemorySize: 256
 
 Resources:
-  SESEmailIdentity:
-    Type: AWS::SES::EmailIdentity
-    Properties:
-      EmailIdentity: !Ref SESEmailAddress
 
-  WebsiteBucket:
+  SubmissionBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'checkmate-replay-web-sukhi90-${AWS::AccountId}-v2'
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: index.html
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
-        BlockPublicPolicy: false
         IgnorePublicAcls: true
-        RestrictPublicBuckets: false
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
 
-  WebsiteBucketPolicy:
-    Type: AWS::S3::BucketPolicy
+  SubmissionTable:
+    Type: AWS::DynamoDB::Table
     Properties:
-      Bucket: !Ref WebsiteBucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: PublicReadForWebsite
-            Effect: Allow
-            Principal: '*'
-            Action:
-              - s3:GetObject
-            Resource:
-              - !Sub 'arn:aws:s3:::${WebsiteBucket}/*'
+      TableName: !Sub CheckmateSubmissions-${AWS::StackName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: submissionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: submissionId
+          KeyType: HASH
 
-  PipelineArtifactBucket:
-    Type: AWS::S3::Bucket
+  ProcessingQueue:
+    Type: AWS::SQS::Queue
     Properties:
-      BucketName: !Sub 'checkmate-replay-artifacts-sukhi90-${AWS::AccountId}-v2'
+      VisibilityTimeout: 300
 
-  CodeBuildRole:
-    Type: AWS::IAM::Role
+  UploadFunction:
+    Type: AWS::Serverless::Function
     Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - !Sub 'codebuild.${AWS::URLSuffix}'
-            Action:
-              - sts:AssumeRole
-      Policies:
-        - PolicyName: DeployFrontendToS3
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:ListBucket
-                Resource:
-                  - !GetAtt WebsiteBucket.Arn
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:PutObject
-                  - s3:DeleteObject
-                Resource:
-                  - !Sub 'arn:aws:s3:::${WebsiteBucket}/*'
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:GetObjectVersion
-                  - s3:ListBucket
-                Resource:
-                  - !GetAtt PipelineArtifactBucket.Arn
-                  - !Sub 'arn:aws:s3:::${PipelineArtifactBucket}/*'
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: '*'
-
-  CodeBuildProject:
-    Type: AWS::CodeBuild::Project
-    Properties:
-      Name: checkmate-replay-hub-build
-      ServiceRole: !GetAtt CodeBuildRole.Arn
-      Artifacts:
-        Type: CODEPIPELINE
-      Source:
-        Type: CODEPIPELINE
-        BuildSpec: buildspec.yml
-      Environment:     
-        ComputeType: BUILD_GENERAL1_SMALL
-        Image: aws/codebuild/standard:7.0
-        Type: LINUX_CONTAINER
-        Variables:
-          - Name: WEBSITE_BUCKET
-            Value: !Ref WebsiteBucket
-
-  CodePipelineRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - !Sub 'codepipeline.${AWS::URLSuffix}'
-            Action:
-              - sts:AssumeRole
-      Policies:
-        - PolicyName: CodePipelineAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:GetObjectVersion
-                  - s3:PutObject
-                  - s3:GetBucketVersioning
-                Resource:
-                  - !GetAtt PipelineArtifactBucket.Arn
-                  - !Sub 'arn:aws:s3:::${PipelineArtifactBucket}/*'
-              - Effect: Allow
-                Action:
-                  - codebuild:StartBuild
-                  - codebuild:BatchGetBuilds
-                Resource:
-                  - !GetAtt CodeBuildProject.Arn
-
-  LambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - !Sub 'lambda.${AWS::URLSuffix}'
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
-
-  CheckmateApiGateway:
-    Type: AWS::ApiGateway::RestApi
-    Properties:
-      Name: checkmate-replay-api
-
-  SubmissionsResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref CheckmateApiGateway
-      ParentId: !GetAtt CheckmateApiGateway.RootResourceId
-      PathPart: submissions
-
-  SubmissionApiMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref CheckmateApiGateway
-      ResourceId: !Ref SubmissionsResource
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SubmissionFunction.Arn}/invocations'
-
-  OptionsApiMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref CheckmateApiGateway
-      ResourceId: !Ref SubmissionsResource
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST,GET'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-            ResponseTemplates:
-              application/json: ""
-            StatusCode: '200'
-        RequestTemplates:
-          application/json: "{\"statusCode\": 200}"
-      MethodResponses:
-        - ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-          StatusCode: '200'
-
-  ApiGatewayDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - SubmissionApiMethod
-      - OptionsApiMethod
-    Properties:
-      RestApiId: !Ref CheckmateApiGateway
-      StageName: Prod
-
-  SubmissionFunctionPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref SubmissionFunction
-      Principal: !Sub 'apigateway.${AWS::URLSuffix}'
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${CheckmateApiGateway}/*/*/submissions'
-
-  SubmissionFunction:
-    Type: AWS::Lambda::Function
-    Properties:
+      CodeUri: ../backend/upload/
       Handler: app.lambda_handler
-      Runtime: python3.9
-      CodeUri: src/
-      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref SubmissionTable
+          BUCKET_NAME: !Ref SubmissionBucket
+          SES_FROM_EMAIL: !Ref SesFromEmail
+          PUBLIC_URL: !Ref PublicUrl
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: checkmate-submissions-table
         - S3CrudPolicy:
-            BucketName: checkmate-upload-bucket
+            BucketName: !Ref SubmissionBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SubmissionTable
         - Statement:
             - Effect: Allow
               Action:
                 - ses:SendEmail
-              Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SESEmailAddress}"
+                - ses:SendRawEmail
+              Resource: '*'
+      Events:
+
+        Upload:
+          Type: HttpApi
+          Properties:
+            Path: /upload
+            Method: POST
+
+        Confirm:
+          Type: HttpApi
+          Properties:
+            Path: /confirm
+            Method: GET
+
+  ProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/processor/
+      Handler: app.lambda_handler
+      Timeout: 300
       Environment:
         Variables:
-          UPLOAD_BUCKET: checkmate-upload-bucket
-          TABLE_NAME: checkmate-submissions-table
-          SES_SENDER_EMAIL: !Ref SESEmailAddress
+          TABLE_NAME: !Ref SubmissionTable
+          BUCKET_NAME: !Ref SubmissionBucket
+          SES_FROM_EMAIL: !Ref SesFromEmail
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref SubmissionBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SubmissionTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: '*'
+      Events:
+        Queue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ProcessingQueue.Arn
+            BatchSize: 1
 
+  QueueSendPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CheckmateUploadSendToQueue
+      Roles:
+        - !GetAtt UploadFunctionRole.Arn
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - sqs:SendMessage
+            Resource: !GetAtt ProcessingQueue.Arn
+
+Outputs:
+
+  ApiUrl:
+    Description: API Gateway URL
+    Value: !Sub https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+
+  BucketName:
+    Description: Submission S3 bucket
+    Value: !Ref SubmissionBucket
+
+  TableName:
+    Description: DynamoDB table
+    Value: !Ref SubmissionTable
+
+  QueueUrl:
+    Description: Processing SQS queue
+    Value: !Ref ProcessingQueue
