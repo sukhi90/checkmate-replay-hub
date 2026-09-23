@@ -120,7 +120,7 @@ Resources:
     Properties:
       PolicyName: CheckmateUploadSendToQueue
       Roles:
-        - !GetAtt UploadFunctionRole.Arn
+        - !Ref UploadFunctionRole
       PolicyDocument:
         Version: '2012-10-17'
         Statement:

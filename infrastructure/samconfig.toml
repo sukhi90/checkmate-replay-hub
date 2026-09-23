@@ -1,13 +1,12 @@
 version = 0.1
 
 [default.deploy.parameters]
-stack_name = "checkmate-replay-hub-m2"
+stack_name = "checkmate-replay-hub-s1"
 resolve_s3 = true
-s3_prefix = "checkmate-replay-hub-m2"
-region = "us-east-1"
+s3_prefix = "checkmate-replay-hub-s1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "GitHubRepository=\"checkmate-replay-hub\" GitHubOwner=\"sukhi90\" GitHubBranch=\"main\" SESEmailAddress=\"sukhjeewansukhi@gmail.com\""
+parameter_overrides = "SesFromEmail=\"\" PublicUrl=\"\""
 image_repositories = []
 
 [default.global.parameters]
