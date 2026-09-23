@@ -6,7 +6,6 @@ Description: Checkmate Replay Hub - Milestones 2, 3 and 4
 Parameters:
   SesFromEmail:
     Type: String
-
   PublicUrl:
     Type: String
 
@@ -15,7 +14,7 @@ Globals:
     Runtime: python3.12
     Timeout: 60
     MemorySize: 256
-
+  # Global HttpApi set karke CORS active kita hai:
   HttpApi:
     CorsConfiguration:
       AllowOrigins:
@@ -56,16 +55,10 @@ Resources:
         - AttributeName: submissionId
           KeyType: HASH
 
-  ProcessingDeadLetterQueue:
-    Type: AWS::SQS::Queue
-
   ProcessingQueue:
     Type: AWS::SQS::Queue
     Properties:
-      VisibilityTimeout: 180
-      RedrivePolicy:
-        deadLetterTargetArn: !GetAtt ProcessingDeadLetterQueue.Arn
-        maxReceiveCount: 3
+      VisibilityTimeout: 300
 
   UploadFunction:
     Type: AWS::Serverless::Function
@@ -78,7 +71,6 @@ Resources:
           BUCKET_NAME: !Ref SubmissionBucket
           SES_FROM_EMAIL: !Ref SesFromEmail
           PUBLIC_URL: !Ref PublicUrl
-
       Policies:
         - S3CrudPolicy:
             BucketName: !Ref SubmissionBucket
@@ -89,19 +81,17 @@ Resources:
               Action:
                 - ses:SendEmail
                 - ses:SendRawEmail
-              Resource: "*"
-
+              Resource: '*'
       Events:
         Upload:
           Type: HttpApi
           Properties:
             Path: /upload
             Method: POST
-
-        GetSubmissionStatus:
+        Confirm:
           Type: HttpApi
           Properties:
-            Path: /submissions/{submissionId}
+            Path: /confirm
             Method: GET
 
   ProcessorFunction:
@@ -109,36 +99,23 @@ Resources:
     Properties:
       CodeUri: ../backend/processor/
       Handler: app.lambda_handler
-      Timeout: 60
-      MemorySize: 512
-
+      Timeout: 300
       Environment:
         Variables:
           TABLE_NAME: !Ref SubmissionTable
-          PROCESSING_QUEUE_URL: !Ref ProcessingQueue
           BUCKET_NAME: !Ref SubmissionBucket
           SES_FROM_EMAIL: !Ref SesFromEmail
-
       Policies:
         - S3ReadPolicy:
             BucketName: !Ref SubmissionBucket
-
         - DynamoDBCrudPolicy:
             TableName: !Ref SubmissionTable
-
         - Statement:
             - Effect: Allow
               Action:
                 - ses:SendEmail
                 - ses:SendRawEmail
-              Resource: "*"
-
-        - Statement:
-            - Effect: Allow
-              Action:
-                - sqs:SendMessage
-              Resource: !GetAtt ProcessingQueue.Arn
-
+              Resource: '*'
       Events:
         Queue:
           Type: SQS
@@ -150,10 +127,8 @@ Resources:
     Type: AWS::IAM::Policy
     Properties:
       PolicyName: CheckmateUploadSendToQueue
-
       Roles:
         - !Ref UploadFunctionRole
-
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -163,23 +138,15 @@ Resources:
             Resource: !GetAtt ProcessingQueue.Arn
 
 Outputs:
-
+  ApiUrl:
+    Description: API Gateway URL
+    Value: !Sub https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com
   BucketName:
     Description: Submission S3 bucket
     Value: !Ref SubmissionBucket
-
   TableName:
     Description: DynamoDB table
     Value: !Ref SubmissionTable
-
   QueueUrl:
-    Description: Processing queue URL
+    Description: Processing SQS queue
     Value: !Ref ProcessingQueue
-
-  ProcessingQueueArn:
-    Description: Processing queue ARN
-    Value: !GetAtt ProcessingQueue.Arn
-
-  ProcessorFunctionName:
-    Description: Chess processor Lambda function name
-    Value: !Ref ProcessorFunction

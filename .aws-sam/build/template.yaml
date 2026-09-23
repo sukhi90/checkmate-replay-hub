@@ -48,10 +48,18 @@ Resources:
       KeySchema:
       - AttributeName: submissionId
         KeyType: HASH
+  ProcessingDeadLetterQueue:
+    Type: AWS::SQS::Queue
   ProcessingQueue:
     Type: AWS::SQS::Queue
     Properties:
-      VisibilityTimeout: 300
+      VisibilityTimeout: 180
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - ProcessingDeadLetterQueue
+          - Arn
+        maxReceiveCount: 3
   UploadFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -86,10 +94,10 @@ Resources:
           Properties:
             Path: /upload
             Method: POST
-        Confirm:
+        GetSubmissionStatus:
           Type: HttpApi
           Properties:
-            Path: /confirm
+            Path: /submissions/{submissionId}
             Method: GET
     Metadata:
       SamResourceId: UploadFunction
@@ -98,11 +106,14 @@ Resources:
     Properties:
       CodeUri: ProcessorFunction
       Handler: app.lambda_handler
-      Timeout: 300
+      Timeout: 60
+      MemorySize: 512
       Environment:
         Variables:
           TABLE_NAME:
             Ref: SubmissionTable
+          PROCESSING_QUEUE_URL:
+            Ref: ProcessingQueue
           BUCKET_NAME:
             Ref: SubmissionBucket
           SES_FROM_EMAIL:
@@ -120,6 +131,14 @@ Resources:
           - ses:SendEmail
           - ses:SendRawEmail
           Resource: '*'
+      - Statement:
+        - Effect: Allow
+          Action:
+          - sqs:SendMessage
+          Resource:
+            Fn::GetAtt:
+            - ProcessingQueue
+            - Arn
       Events:
         Queue:
           Type: SQS
@@ -148,10 +167,6 @@ Resources:
             - ProcessingQueue
             - Arn
 Outputs:
-  ApiUrl:
-    Description: API Gateway URL
-    Value:
-      Fn::Sub: https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com
   BucketName:
     Description: Submission S3 bucket
     Value:
@@ -161,6 +176,16 @@ Outputs:
     Value:
       Ref: SubmissionTable
   QueueUrl:
-    Description: Processing SQS queue
+    Description: Processing queue URL
     Value:
       Ref: ProcessingQueue
+  ProcessingQueueArn:
+    Description: Processing queue ARN
+    Value:
+      Fn::GetAtt:
+      - ProcessingQueue
+      - Arn
+  ProcessorFunctionName:
+    Description: Chess processor Lambda function name
+    Value:
+      Ref: ProcessorFunction

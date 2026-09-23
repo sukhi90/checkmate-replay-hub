@@ -18,7 +18,6 @@ from botocore.exceptions import ClientError
 s3 = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
 ses = boto3.client("ses")
-PROCESSING_QUEUE_URL = os.environ["PROCESSING_QUEUE_URL"]
 
 
 # ---------------------------------------------------------
@@ -568,12 +567,6 @@ def confirm_submission(event):
                 ":confirmed_at": now_iso()
             }
         )
-            sqs.send_message(
-            QueueUrl=PROCESSING_QUEUE_URL,
-            MessageBody=json.dumps({
-                "submissionId": submission_id
-            })
-        )
 
     except ClientError as e:
 
@@ -619,30 +612,7 @@ def confirm_submission(event):
         The chess processing will be handled in the next milestone.
         """
     )
-# 🟢 1. ਇਹ ਨਵਾਂ ਫੰਕਸ਼ਨ ਇੱਥੇ ਬਿਲਕੁਲ ਬਾਹਰ (0 ਸਪੇਸ ਦੇ ਨਾਲ) ਪੇਸਟ ਕਰੋ
-def get_submission_status(submission_id):
-    response = table.get_item(
-        Key={"submissionId": submission_id}
-    )
-    item = response.get("Item")
-    
-    if not item:
-        return response_json(404, {"error": "Submission not found."})
-        
-    result = {
-        "submissionId": item["submissionId"],
-        "status": item["status"],
-        "fileName": item.get("fileName"),
-    }
-    
-    if "winner" in item:
-        result["winner"] = item["winner"]
-    if "moveCount" in item:
-        result["moveCount"] = int(item["moveCount"])
-    if "errorReason" in item:
-        result["errorReason"] = item["errorReason"]
-        
-    return response_json(200, result)
+
 
 # ---------------------------------------------------------
 # Lambda entry point
