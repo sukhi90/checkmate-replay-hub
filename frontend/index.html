@@ -4,53 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkmate Replay Hub</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; color: #333; }
+        .container { max-width: 500px; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin: auto; }
+        h1 { text-align: center; color: #444; }
+        label { font-weight: bold; display: block; margin-top: 15px; }
+        input[type="email"], input[type="file"] { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; margin-top: 20px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        #status { font-weight: bold; text-align: center; margin-top: 20px; font-size: 16px; }
+    </style>
 </head>
 <body>
-
-<div class="container">
-
-    <h1>Checkmate Replay Hub</h1>
-
-    <p>
-        Upload a chess replay file and confirm your submission by email.
-    </p>
-
-    <form id="uploadForm">
-
-        <label>
-            Email address
-        </label>
-
-        <input
-            id="email"
-            type="email"
-            required
-            placeholder="you@example.com"
-        >
-
-        <label>
-            Chess replay file
-        </label>
-
-        <input
-            id="file"
-            type="file"
-            required
-            accept=".txt"
-        >
-
-        <button type="submit">
-            Upload game
-        </button>
-
-    </form>
-
-    <div id="status"></div>
-
-</div>
-
-<script src="app.js"></script>
-
+    <div class="container">
+        <h1>Checkmate Replay Hub</h1>
+        <form id="uploadForm">
+            <label for="email">Email Address:</label>
+            <input type="email" id="email" required placeholder="your-email@example.com">
+            
+            <label for="file">Chess Replay File (.txt):</label>
+            <input type="file" id="file" accept=".txt" required>
+            
+            <button type="submit">Upload Replay</button>
+        </form>
+        <div id="status"></div>
+    </div>
+    <!-- ?v=2 lagan naal browser puraani cache hamesha layi mita devega -->
+    <script src="app.js?v=2"></script>
 </body>
 </html>

@@ -11,6 +11,18 @@ Globals:
     Runtime: python3.12
     Timeout: 60
     MemorySize: 256
+  HttpApi:
+    CorsConfiguration:
+      AllowOrigins:
+      - http://54.80.249.185
+      - http://localhost
+      AllowHeaders:
+      - content-type
+      - authorization
+      AllowMethods:
+      - POST
+      - GET
+      - OPTIONS
 Resources:
   SubmissionBucket:
     Type: AWS::S3::Bucket
