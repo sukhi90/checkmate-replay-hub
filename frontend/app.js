@@ -26,22 +26,33 @@ form.addEventListener("submit", function(e) {
     }
 
     // 1. Get presigned URL from API Gateway
-   fetch(window.CHECKMATE_API_URL + "/upload", {
+   const reader = new FileReader();
+reader.onload = function() {
+    fetch("https://amazonaws.com", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify({
             email: email,
-            filename: file.name // <-- NOW VALID: file.name will work perfectly
+            filename: file.name,
+            content: reader.result
         })
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error("Backend API error");
-        }
-        return response.json();
+    .then(response => response.json())
+    .then(data => {
+        console.log(data);
+        statusBox.textContent = "Upload successful. Check your email for confirmation.";
+        statusBox.style.color = "green";
     })
+    .catch(error => {
+        console.error(error);
+        statusBox.textContent = "Upload failed.";
+        statusBox.style.color = "red";
+    });
+};
+reader.readAsText(file);
+
     .then(data => {
         // 2. Direct upload to S3 using presigned URL
         return fetch(data.uploadUrl, {
