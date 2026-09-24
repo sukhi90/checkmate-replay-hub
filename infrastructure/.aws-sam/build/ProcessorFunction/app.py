@@ -1,366 +1,143 @@
-import os
 import json
+import os
 from datetime import datetime, timezone
-
 import boto3
+from botocore.exceptions import ClientError
+from chess_validator import validate_game, ChessValidationError
 
 s3 = boto3.client("s3")
-ddb = boto3.resource("dynamodb")
-ses = boto3.client("sesv2")
-
-TABLE = ddb.Table(os.environ["TABLE_NAME"])
-FROM_EMAIL = os.environ["SES_FROM_EMAIL"]
-
-
-FILES = {
-    "a": "RNBQKBNR",
-    "b": "RNBQKBNR",
-}
-
-
-def square_to_xy(square):
-    if len(square) != 2:
-        return None
-
-    file = square[0]
-    rank = square[1]
-
-    if file not in "abcdefgh":
-        return None
-
-    if rank not in "12345678":
-        return None
-
-    return ord(file) - ord("a"), int(rank) - 1
-
-
-def initial_board():
-    board = {}
-
-    for i, p in enumerate("RNBQKBNR"):
-        board[(i, 0)] = ("W", p)
-
-    for i in range(8):
-        board[(i, 1)] = ("W", "P")
-
-    for i, p in enumerate("RNBQKBNR"):
-        board[(i, 7)] = ("B", p)
-
-    for i in range(8):
-        board[(i, 6)] = ("B", "P")
-
-    return board
-
-
-def clear_path(board, sx, sy, dx, dy):
-    stepx = 0 if dx == sx else (1 if dx > sx else -1)
-    stepy = 0 if dy == sy else (1 if dy > sy else -1)
-
-    x = sx + stepx
-    y = sy + stepy
-
-    while (x, y) != (dx, dy):
-        if (x, y) in board:
-            return False
-        x += stepx
-        y += stepy
-
-    return True
-
-
-def legal_piece_move(piece, sx, sy, dx, dy, board, capture):
-    p = piece
-
-    ax = abs(dx - sx)
-    ay = abs(dy - sy)
-
-    if p == "P":
-        direction = 1 if piece[0] == "W" else -1
-
-    return True
-
-
-def validate_move(board, side, src, dst):
-    s = square_to_xy(src)
-    d = square_to_xy(dst)
-
-    if s is None or d is None:
-        return False, "Invalid square."
-
-    sx, sy = s
-    dx, dy = d
-
-    if (sx, sy) not in board:
-        return False, f"No piece exists on {src}."
-
-    color, piece = board[(sx, sy)]
-
-    if color != side:
-        return False, f"It is not {color}'s turn for piece on {src}."
-
-    target = board.get((dx, dy))
-
-    if target and target[0] == side:
-        return False, f"Destination {dst} contains your own piece."
-
-    ax = abs(dx - sx)
-    ay = abs(dy - sy)
-
-    valid = False
-
-    if piece == "P":
-        direction = 1 if side == "W" else -1
-        start_rank = 1 if side == "W" else 6
-
-        if dx == sx and target is None and dy - sy == direction:
-            valid = True
-
-        elif (
-            dx == sx
-            and target is None
-            and sy == start_rank
-            and dy - sy == 2 * direction
-            and (sx, sy + direction) not in board
-        ):
-            valid = True
-
-        elif (
-            ax == 1
-            and dy - sy == direction
-            and target is not None
-            and target[0] != side
-        ):
-            valid = True
-
-    elif piece == "N":
-        valid = (ax, ay) in ((1, 2), (2, 1))
-
-    elif piece == "B":
-        valid = ax == ay and clear_path(board, sx, sy, dx, dy)
-
-    elif piece == "R":
-        valid = (
-            (sx == dx or sy == dy)
-            and clear_path(board, sx, sy, dx, dy)
-        )
-
-    elif piece == "Q":
-        valid = (
-            (sx == dx or sy == dy or ax == ay)
-            and clear_path(board, sx, sy, dx, dy)
-        )
-
-    elif piece == "K":
-        valid = max(ax, ay) == 1
-
-    if not valid:
-        return False, f"Illegal {piece} move from {src} to {dst}."
-
-    del board[(sx, sy)]
-    board[(dx, dy)] = (side, piece)
-
-    return True, ""
-
-
-def analyse(content):
-    board = initial_board()
-
-    side = "W"
-    move_count = 0
-
-    lines = content.splitlines()
-
-    for number, raw in enumerate(lines, 1):
-        line = raw.strip()
-
-        if not line:
-            continue
-
-        parts = line.split()
-
-        if len(parts) != 2:
-            return False, f"Invalid format on line {number}. Expected: e2 e4", None, None
-
-        src, dst = parts
-
-        ok, error = validate_move(
-            board,
-            side,
-            src,
-            dst
-        )
-
-        if not ok:
-            return False, f"Line {number}: {error}", None, None
-
-        move_count += 1
-        side = "B" if side == "W" else "W"
-
-    if move_count == 0:
-        return False, "The chess file contains no moves.", None, None
-
-    # This simplified project format does not contain explicit result
-    # metadata. We determine whether a king remains on the board.
-    white_king = any(
-        color == "W" and piece == "K"
-        for color, piece in board.values()
-    )
-
-    black_king = any(
-        color == "B" and piece == "K"
-        for color, piece in board.values()
-    )
-
-    if not white_king and not black_king:
-        winner = "Draw"
-    elif not white_king:
-        winner = "Black"
-    elif not black_king:
-        winner = "White"
+ses = boto3.client("ses")
+dynamodb = boto3.resource("dynamodb")
+
+table = dynamodb.Table(os.environ["TABLE_NAME"])
+UPLOAD_BUCKET = os.environ["UPLOAD_BUCKET"]
+SES_SENDER_EMAIL = os.environ["SES_SENDER_EMAIL"]
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+def send_result_email(email, submission_id, status, winner=None, moves=None, error_reason=None):
+    subject = "Checkmate Replay Hub - Submission result"
+    
+    if status == "DONE":
+        winner_text = {"white": "White", "black": "Black", "draw": "Draw"}.get(winner, winner)
+        text_body = f"""Your Checkmate Replay Hub submission was processed successfully.
+Submission ID: {submission_id}
+Status: DONE
+Winner: {winner_text}
+Number of moves: {moves}
+"""
+        html_body = f"""<html><body>
+<h2>Checkmate Replay Hub</h2>
+<p>Your chess submission was processed successfully.</p>
+<p><strong>Status:</strong> DONE<br>
+<strong>Submission ID:</strong> {submission_id}<br>
+<strong>Winner:</strong> {winner_text}<br>
+<strong>Number of moves:</strong> {moves}</p>
+</body></html>"""
     else:
-        winner = "Draw"
+        text_body = f"""Your Checkmate Replay Hub submission could not be processed.
+Submission ID: {submission_id}
+Status: FAILED
+Reason: {error_reason}
+"""
+        html_body = f"""<html><body>
+<h2>Checkmate Replay Hub</h2>
+<p>Your chess submission could not be processed.</p>
+<p><strong>Status:</strong> FAILED<br>
+<strong>Submission ID:</strong> {submission_id}</p>
+<p><strong>Reason:</strong><br>{error_reason}</p>
+<p>Please correct the chess file and submit it again.</p>
+</body></html>"""
 
-    return True, "", winner, move_count
-
-
-def send_email(to, subject, body):
     ses.send_email(
-        FromEmailAddress=FROM_EMAIL,
-        Destination={"ToAddresses": [to]},
-        Content={
-            "Simple": {
-                "Subject": {
-                    "Data": subject,
-                    "Charset": "UTF-8"
-                },
-                "Body": {
-                    "Text": {
-                        "Data": body,
-                        "Charset": "UTF-8"
-                    }
-                }
-            }
-        }
+        Source=SES_SENDER_EMAIL,
+        Destination={"ToAddresses": [email]},
+        Message={
+            "Subject": {"Data": subject, "Charset": "UTF-8"},
+            "Body": {
+                "Text": {"Data": text_body, "Charset": "UTF-8"},
+                "Html": {"Data": html_body, "Charset": "UTF-8"},
+            },
+        },
     )
 
+def update_done(submission_id, winner, moves):
+    table.update_item(
+        Key={"submissionId": submission_id},
+        UpdateExpression="""SET #status=:status,
+                            winner=:winner, moveCount=:moves, processedAt=:processed_at""",
+        ExpressionAttributeNames={"#status": "status"},
+        ExpressionAttributeValues={
+            ":status": "DONE",
+            ":winner": winner,
+            ":moves": moves,
+            ":processed_at": now_iso(),
+        },
+    )
+
+def update_failed(submission_id, reason):
+    table.update_item(
+        Key={"submissionId": submission_id},
+        UpdateExpression="""SET #status=:status,
+                            errorReason=:reason, processedAt=:processed_at""",
+        ExpressionAttributeNames={"#status": "status"},
+        ExpressionAttributeValues={
+            ":status": "FAILED",
+            ":reason": reason,
+            ":processed_at": now_iso(),
+        },
+    )
 
 def process_submission(submission_id):
-    item = TABLE.get_item(
-        Key={"submissionId": submission_id}
-    ).get("Item")
-
+    response = table.get_item(Key={"submissionId": submission_id})
+    item = response.get("Item")
     if not item:
-        return
-
-    if item.get("status") != "PROCESSING":
-        return
-
+        raise RuntimeError(f"Submission {submission_id} does not exist.")
+        
+    email = item["email"]
+    s3_key = item["s3Key"]
+    
+    if item.get("status") in ("DONE", "FAILED"):
+        return {"status": item["status"], "message": "Already processed."}
+        
     try:
-        obj = s3.get_object(
-            Bucket=os.environ["BUCKET_NAME"],
-            Key=item["s3Key"]
-        )
-
+        obj = s3.get_object(Bucket=UPLOAD_BUCKET, Key=s3_key)
         content = obj["Body"].read().decode("utf-8")
-
-        valid, error, winner, move_count = analyse(content)
-
-        now = datetime.now(timezone.utc).isoformat()
-
-        if not valid:
-            TABLE.update_item(
-                Key={"submissionId": submission_id},
-                UpdateExpression="""
-                    SET #s = :failed,
-                        errorReason = :error,
-                        completedAt = :now
-                """,
-                ExpressionAttributeNames={
-                    "#s": "status"
-                },
-                ExpressionAttributeValues={
-                    ":failed": "FAILED",
-                    ":error": error,
-                    ":now": now
-                }
-            )
-
-            send_email(
-                item["email"],
-                "Checkmate Replay Hub - Processing failed",
-                f"""Your chess submission could not be processed.
-
-Reason:
-
-{error}
-
-Please correct the chess file and submit it again.
-"""
-            )
-
-            return
-
-        TABLE.update_item(
-            Key={"submissionId": submission_id},
-            UpdateExpression="""
-                SET #s = :done,
-                    winner = :winner,
-                    moveCount = :moves,
-                    completedAt = :now
-            """,
-            ExpressionAttributeNames={
-                "#s": "status"
-            },
-            ExpressionAttributeValues={
-                ":done": "DONE",
-                ":winner": winner,
-                ":moves": move_count,
-                ":now": now
-            }
+    except UnicodeDecodeError:
+        reason = "The uploaded file is not valid UTF-8 text."
+        update_failed(submission_id, reason)
+        send_result_email(email, submission_id, "FAILED", error_reason=reason)
+        return {"status": "FAILED", "reason": reason}
+    except ClientError as exc:
+        print(f"S3 error for {submission_id}: {exc}")
+        reason = "The uploaded chess file could not be read from secure storage."
+        update_failed(submission_id, reason)
+        send_result_email(email, submission_id, "FAILED", error_reason=reason)
+        return {"status": "FAILED", "reason": reason}
+        
+    try:
+        result = validate_game(content.splitlines())
+        update_done(submission_id, result["winner"], result["moves"])
+        send_result_email(
+            email, submission_id, "DONE",
+            winner=result["winner"], moves=result["moves"]
         )
-
-        send_email(
-            item["email"],
-            "Checkmate Replay Hub - Game Result",
-            f"""Your chess submission was processed successfully.
-
-Result: {winner}
-Number of moves: {move_count}
-
-Thank you for using Checkmate Replay Hub.
-"""
-        )
-
-    except Exception as exc:
-        print("PROCESSING ERROR:", repr(exc))
-
-        now = datetime.now(timezone.utc).isoformat()
-
-        TABLE.update_item(
-            Key={"submissionId": submission_id},
-            UpdateExpression="""
-                SET #s = :failed,
-                    errorReason = :error,
-                    completedAt = :now
-            """,
-            ExpressionAttributeNames={
-                "#s": "status"
-            },
-            ExpressionAttributeValues={
-                ":failed": "FAILED",
-                ":error": "Internal processing error.",
-                ":now": now
-            }
-        )
-
+        return {
+            "status": "DONE",
+            "winner": result["winner"],
+            "moves": result["moves"],
+        }
+    except ChessValidationError as exc:
+        reason = str(exc)
+        update_failed(submission_id, reason)
+        send_result_email(email, submission_id, "FAILED", error_reason=reason)
+        return {"status": "FAILED", "reason": reason}
 
 def lambda_handler(event, context):
+    print("Received SQS event:", json.dumps(event))
+    results = []
     for record in event.get("Records", []):
-        try:
-            body = json.loads(record["body"])
-            submission_id = body["submissionId"]
-            process_submission(submission_id)
-        except Exception as exc:
-            print("QUEUE ERROR:", repr(exc))
-
-    return {"statusCode": 200}
+        body = json.loads(record["body"])
+        results.append(process_submission(body["submissionId"]))
+    return {"processed": len(results), "results": results}
