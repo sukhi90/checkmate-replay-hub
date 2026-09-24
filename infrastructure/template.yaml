@@ -19,7 +19,7 @@ Globals:
   HttpApi:
     CorsConfiguration:
       AllowOrigins:
-        - "http://54.80.249.185"
+        - "http://100.54.111.76"
         - "http://localhost"
       AllowHeaders:
         - "content-type"

@@ -7,7 +7,7 @@ s3_prefix = "checkmate-replay-hub-s1"
 region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "SesFromEmail=\"\" PublicUrl=\"\""
+parameter_overrides = "SesFromEmail=\"sukhjeewansukhi@gmail.com\" PublicUrl=\"100.54.111.76\""
 image_repositories = []
 
 [default.global.parameters]
