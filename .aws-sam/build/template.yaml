@@ -14,7 +14,7 @@ Globals:
   HttpApi:
     CorsConfiguration:
       AllowOrigins:
-      - http://100.54.111.76
+      - http://54.196.205.126
       - http://localhost
       AllowHeaders:
       - content-type
@@ -103,6 +103,7 @@ Resources:
       SamResourceId: UploadFunction
   ProcessorFunction:
     Type: AWS::Serverless::Function
+    DependsOn: ProcessingQueue
     Properties:
       CodeUri: ProcessorFunction
       Handler: app.lambda_handler
@@ -128,6 +129,12 @@ Resources:
       - Statement:
         - Effect: Allow
           Action:
+          - s3:PutObject
+          Resource:
+            Fn::Sub: arn:${AWS::Partition}:s3:::${SubmissionBucket}/results/*
+      - Statement:
+        - Effect: Allow
+          Action:
           - ses:SendEmail
           - ses:SendRawEmail
           Resource: '*'
@@ -150,6 +157,37 @@ Resources:
             BatchSize: 1
     Metadata:
       SamResourceId: ProcessorFunction
+  ConfirmFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ConfirmFunction
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          TABLE_NAME:
+            Ref: SubmissionTable
+          PROCESSING_QUEUE_URL:
+            Ref: ProcessingQueue
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: SubmissionTable
+      - Statement:
+        - Effect: Allow
+          Action:
+          - sqs:SendMessage
+          Resource:
+            Fn::GetAtt:
+            - ProcessingQueue
+            - Arn
+      Events:
+        Confirm:
+          Type: HttpApi
+          Properties:
+            Path: /confirm/{token}
+            Method: GET
+    Metadata:
+      SamResourceId: ConfirmFunction
   QueueSendPolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -189,3 +227,7 @@ Outputs:
     Description: Chess processor Lambda function name
     Value:
       Ref: ProcessorFunction
+  ApiUrl:
+    Description: API Gateway URL
+    Value:
+      Fn::Sub: https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com

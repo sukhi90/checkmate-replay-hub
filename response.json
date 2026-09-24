@@ -1,1 +1,1 @@
-{"statusCode": 200, "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "OPTIONS,POST,GET"}, "body": "{\"message\": \"Hello from Submission inline default backend!\", \"status\": \"success\"}"}
+{"statusCode": 200, "headers": {"Content-Type": "text/html"}, "body": "\n        <html>\n        <body>\n            <h2>Submission confirmed</h2>\n            <p>Processing has started.</p>\n        </body>\n        </html>\n        "}

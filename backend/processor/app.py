@@ -10,8 +10,8 @@ ses = boto3.client("ses")
 dynamodb = boto3.resource("dynamodb")
 
 table = dynamodb.Table(os.environ["TABLE_NAME"])
-UPLOAD_BUCKET = os.environ["UPLOAD_BUCKET"]
-SES_SENDER_EMAIL = os.environ["SES_SENDER_EMAIL"]
+UPLOAD_BUCKET = os.environ["BUCKET_NAME"]
+SES_SENDER_EMAIL = os.environ["SES_FROM_EMAIL"]
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -62,15 +62,16 @@ Reason: {error_reason}
         },
     )
 
-def update_done(submission_id, winner, moves):
+def update_done(submission_id, winner, moves, board_key):
     table.update_item(
         Key={"submissionId": submission_id},
         UpdateExpression="""SET #status=:status,
-                            winner=:winner, moveCount=:moves, processedAt=:processed_at""",
+                            winner=:winner, moveCount=:moves, boardImageKey=:moves; processedAt=:processed_at""",
         ExpressionAttributeNames={"#status": "status"},
         ExpressionAttributeValues={
             ":status": "DONE",
             ":winner": winner,
+            ":board_key": board_key,
             ":moves": moves,
             ":processed_at": now_iso(),
         },

@@ -14,7 +14,7 @@ Globals:
   HttpApi:
     CorsConfiguration:
       AllowOrigins:
-      - http://100.54.111.76
+      - http://54.196.205.126
       - http://localhost
       AllowHeaders:
       - content-type
@@ -103,6 +103,7 @@ Resources:
       SamResourceId: UploadFunction
   ProcessorFunction:
     Type: AWS::Serverless::Function
+    DependsOn: ProcessingQueue
     Properties:
       CodeUri: ProcessorFunction
       Handler: app.lambda_handler
@@ -125,6 +126,12 @@ Resources:
       - DynamoDBCrudPolicy:
           TableName:
             Ref: SubmissionTable
+      - Statement:
+        - Effect: Allow
+          Action:
+          - s3:PutObject
+          Resource:
+            Fn::Sub: arn:${AWS::Partition}:s3:::${SubmissionBucket}/results/*
       - Statement:
         - Effect: Allow
           Action:

@@ -10,8 +10,8 @@ ses = boto3.client("ses")
 dynamodb = boto3.resource("dynamodb")
 
 table = dynamodb.Table(os.environ["TABLE_NAME"])
-UPLOAD_BUCKET = os.environ["UPLOAD_BUCKET"]
-SES_SENDER_EMAIL = os.environ["SES_SENDER_EMAIL"]
+UPLOAD_BUCKET = os.environ["BUCKET_NAME"]
+SES_SENDER_EMAIL = os.environ["SES_FROM_EMAIL"]
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()

@@ -4,6 +4,8 @@ from werkzeug.utils import secure_filename
 import uuid
 import re
 import os
+import boto3  # <-- AWS SDK ਜੋੜਿਆ
+from botocore.exceptions import ClientError
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -28,13 +30,23 @@ EMAIL_PATTERN = re.compile(
     r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 )
 
+# ---------------- AWS Configuration ----------------
+# Environment Variables ਤੋਂ ਟੇਬਲ ਦਾ ਨਾਮ ਅਤੇ API ਦਾ URL ਲਵਾਂਗੇ
+TABLE_NAME = os.environ.get('DYNAMODB_TABLE', 'YourDynamoDBTableName')
+PUBLIC_URL = os.environ.get('API_GATEWAY_URL', 'http://localhost:8000') 
+SENDER_EMAIL = "your-verified-ses-email@example.com" # <--- ਇੱਥੇ ਆਪਣੀ AWS SES ਵਾਲੀ ਵੈਰੀਫਾਈਡ ਈਮੇਲ ਲਿਖੋ
+
+# AWS Clients ਸੈੱਟਅੱਪ
+dynamodb = boto3.resource('dynamodb', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+ses_client = boto3.client('ses', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+# ---------------------------------------------------
 
 def allowed_file(filename):
     if "." not in filename:
         return False
 
     extension = filename.rsplit(".", 1)[1].lower()
-    return extension in ALLOWED_EXTENSIONS
+    return extension in ALLOWED_EXTENSIONS  # Indentation ਸਹੀ ਕੀਤੀ
 
 
 @app.get("/")
@@ -94,6 +106,56 @@ def upload():
             "message": "The file could not be stored."
         }), 500
 
+    # ---------------- ਨਵਾਂ ਕੋਡ: DynamoDB ਅਤੇ SES Email ----------------
+    try:
+        # 1. ਰੈਂਡਮ ਕਨਫਰਮੇਸ਼ਨ ਟੋਕਨ ਬਣਾਓ
+        confirmation_token = str(uuid.uuid4())
+
+        # 2. DynamoDB ਵਿੱਚ ਡਾਟਾ ਸੇਵ ਕਰੋ
+        table = dynamodb.Table(TABLE_NAME)
+        table.put_item(
+            Item={
+                'email': email,
+                'confirmationToken': confirmation_token,
+                'filename': random_filename,
+                'status': 'PENDING'
+            }
+        )
+
+        # 3. API Gateway / Server URL ਮੁਤਾਬਕ ਕਨਫਰਮ ਲਿੰਕ ਤਿਆਰ ਕਰੋ
+        confirm_url = f"{PUBLIC_URL}/confirm/{confirmation_token}"
+
+        # 4. Email Template (HTML) ਤਿਆਰ ਕਰੋ
+        subject = "Confirm your ChessMate upload"
+        body_html = f"""
+        <html>
+        <body>
+          <h2>File Uploaded Successfully!</h2>
+          <p>Thank you for uploading <b>{original_filename}</b>.</p>
+          <p>Please click the button below to confirm your upload and process the chess file:</p>
+          <p><a href='{confirm_url}' style='background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;'>Confirm Upload</a></p>
+          <br>
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p>{confirm_url}</p>
+        </body>
+        </html>
+        """
+
+        # 5. AWS SES ਰਾਹੀਂ ਯੂਜ਼ਰ ਨੂੰ ਈਮੇਲ ਭੇਜੋ
+        ses_client.send_email(
+            Source=SENDER_EMAIL,
+            Destination={'ToAddresses': [email]},
+            Message={
+                'Subject': {'Data': subject, 'Charset': 'UTF-8'},
+                'Body': {'Html': {'Data': body_html, 'Charset': 'UTF-8'}}
+            }
+        )
+
+    except ClientError as e:
+        print(f"AWS ERROR: {e.response['Error']['Message']}")
+        # ਫਾਈਲ ਅਪਲੋਡ ਹੋ ਗਈ ਹੈ ਪਰ ਈਮੇਲ ਫੇਲ ਹੋਈ, ਤੁਸੀਂ ਚਾਹੋ ਤਾਂ ਇੱਥੇ Error ਰਿਟਰਨ ਕਰ ਸਕਦੇ ਹੋ
+    # ------------------------------------------------------------------
+
     print(
         f"UPLOAD: email={email}, "
         f"original={original_filename}, "
@@ -102,7 +164,7 @@ def upload():
 
     return jsonify({
         "status": "UPLOADED",
-        "message": "File uploaded successfully."
+        "message": "File uploaded successfully. Please check your email to confirm."
     }), 200
 
 

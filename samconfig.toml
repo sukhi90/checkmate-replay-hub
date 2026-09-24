@@ -4,10 +4,9 @@ version = 0.1
 stack_name = "checkmate-replay-hub-s1"
 resolve_s3 = true
 s3_prefix = "checkmate-replay-hub-s1"
-region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "SesFromEmail=\"sukhjeewansukhi@gmail.com\" PublicUrl=\"100.54.111.76\""
+parameter_overrides = "SesFromEmail=\"sukhjeewansukhi@gmail.com\" PublicUrl=\"54.196.205.126\""
 image_repositories = []
 
 [default.global.parameters]

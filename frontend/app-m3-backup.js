@@ -1,4 +1,4 @@
-window.CHECKMATE_API_URL = "https://bawj7v9wl8.execute-api.us-east-1.amazonaws.com";
+window.CHECKMATE_API_URL = "https://m36xplfjia.execute-api.us-east-1.amazonaws.com";
 const form = document.getElementById("uploadForm");
 const statusBox = document.getElementById("status");
 
@@ -28,7 +28,7 @@ form.addEventListener("submit", function(e) {
     // 1. Get presigned URL from API Gateway
    const reader = new FileReader();
 reader.onload = function() {
-    fetch("https://amazonaws.com", {
+    fetch("https://m36xplfjia.execute-api.us-east-1.amazonaws.com/upload", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -52,28 +52,4 @@ reader.onload = function() {
     });
 };
 reader.readAsText(file);
-
-    .then(data => {
-        // 2. Direct upload to S3 using presigned URL
-        return fetch(data.uploadUrl, {
-            method: "PUT",
-            body: file,
-            headers: {
-                "Content-Type": "text/plain"
-            }
-        });
-    })
-    .then(s3Response => {
-        if (s3Response.ok) {
-            statusBox.textContent = "UPLOADED Successfully!";
-            statusBox.style.color = "green";
-        } else {
-            throw new Error("S3 Upload Failed");
-        }
-    })
-    .catch(error => {
-        console.error("Error:", error);
-        statusBox.textContent = "ERROR: Upload failed. Please try again.";
-        statusBox.style.color = "red";
-    });
 });

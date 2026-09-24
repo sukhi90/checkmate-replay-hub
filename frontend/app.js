@@ -1,4 +1,4 @@
-window.CHECKMATE_API_URL = "https://m36xplfjia.execute-api.us-east-1.amazonaws.com";
+window.CHECKMATE_API_URL = "https://3cnwsveo2i.execute-api.us-east-1.amazonaws.com ";
 const form = document.getElementById("uploadForm");
 const statusBox = document.getElementById("status");
 
@@ -28,7 +28,7 @@ form.addEventListener("submit", function(e) {
     // 1. Get presigned URL from API Gateway
    const reader = new FileReader();
 reader.onload = function() {
-    fetch("https://m36xplfjia.execute-api.us-east-1.amazonaws.com/upload", {
+    fetch("https://3cnwsveo2i.execute-api.us-east-1.amazonaws.com/upload", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
